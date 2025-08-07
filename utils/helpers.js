@@ -200,4 +200,170 @@ function getDocumentId() {
       return [];
     }
   }
+
+function includeServerSide(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function validateSingleHeadline1() {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const bodyText = doc.getBody().getText();
+
+    const h1Pattern = /^#\s+/gm;
+    const h1Matches = bodyText.match(h1Pattern);
+
+    if (!h1Matches || h1Matches.length === 0) {
+      return {
+        isValid: false,
+        message: 'Nenhum Headline1 encontrado no documento.'
+      };
+    }
+
+    if (h1Matches.length === 1) {
+      return {
+        isValid: true,
+        message: 'Documento válido com um único Headline1.'
+      };
+    }
+
+    return {
+      isValid: false,
+      showDialog: true,
+      uniqueHeadline1s: h1Matches.map((match, index) => `H1 ${index + 1}`),
+      message: `Foram encontrados ${h1Matches.length} Headline1 diferentes no documento.`
+    };
+
+  } catch (error) {
+    return {
+      isValid: false,
+      message: 'Erro ao analisar a estrutura do documento: ' + error.message
+    };
+  }
+}
+
+function buildDocumentStructureWithH1Only(text, headline1Rules, headline2Rules) {
+  const lines = text.split('\n');
+  let currentHeadline1 = null;
+  let documentStructure = [];
+  let foundFirstStructure = false;
+  let awaitingHeadline2 = false;
+
+  lines.forEach((line, idx) => {
+    if (line.trim() === "") return;
+
+    if (headline1Rules.some(rule => rule.condition(line))) {
+      if (awaitingHeadline2 && currentHeadline1) {
+        documentStructure.push({
+          headline1: currentHeadline1,
+          headline2: "Documento Indefinido",
+          text: ''
+        });
+      }
+
+      currentHeadline1 = line;
+      awaitingHeadline2 = true;
+    }
+    else if (headline2Rules.some(rule => rule.condition(line))) {
+      documentStructure.push({
+        headline1: currentHeadline1,
+        headline2: line,
+        text: ''
+      });
+      foundFirstStructure = true;
+      awaitingHeadline2 = false;
+    }
+    else if (awaitingHeadline2) {
+      documentStructure.push({
+        headline1: currentHeadline1,
+        headline2: "Título",
+        text: line + '\n'
+      });
+      foundFirstStructure = true;
+      awaitingHeadline2 = false;
+    }
+    else if (documentStructure.length > 0) {
+      documentStructure[documentStructure.length - 1].text += line + '\n';
+    }
+  });
+
+  if (awaitingHeadline2 && currentHeadline1) {
+    documentStructure.push({
+      headline1: currentHeadline1,
+      headline2: "Documento Indefinido",
+      text: ''
+    });
+  }
+
+  return documentStructure;
+}
+
+function openAppendChoiceDialog(uniqueHeadline1s, textToAppend, shouldFormat) {
+  const html = HtmlService.createTemplateFromFile('dialogs/append_choice_dialog.html');
+  html.uniqueHeadline1s = uniqueHeadline1s;
+  html.textToAppend = textToAppend;
+  html.shouldFormat = shouldFormat;
+
+  const dialog = html.evaluate()
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME)
+    .setWidth(400)
+    .setHeight(300);
+
+  DocumentApp.getUi().showModalDialog(dialog, 'Escolha o Headline1');
+}
+
+function validateHeadline1sForBrush() {
+  try {
+    const doc = DocumentApp.getActiveDocument();
+    const bodyText = doc.getBody().getText();
+
+    const validation = validateSingleHeadline1();
+
+    if (!validation.isValid && validation.showDialog) {
+      return {
+        isValid: false,
+        showDialog: true,
+        uniqueHeadline1s: validation.uniqueHeadline1s,
+        message: validation.message
+      };
+    }
+
+    return validation;
+
+  } catch (error) {
+    return {
+      isValid: false,
+      message: 'Erro ao validar estrutura para brush: ' + error.message
+    };
+  }
+}
+
+function getBrushToHeadline2s() {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    const stored = properties.getProperty('brushToHeadline2s');
+
+    if (stored) {
+      return JSON.parse(stored);
+    }
+
+    return [];
+
+  } catch (error) {
+    console.error('❌ Erro ao obter brush mapping:', error);
+    return [];
+  }
+}
+
+function saveBrushToHeadline2s(toHeadline2sArray) {
+  try {
+    const properties = PropertiesService.getScriptProperties();
+    properties.setProperty('brushToHeadline2s', JSON.stringify(toHeadline2sArray));
+
+    console.log('✅ Brush mapping salvo');
+
+  } catch (error) {
+    console.error('❌ Erro ao salvar brush mapping:', error);
+  }
+}
   

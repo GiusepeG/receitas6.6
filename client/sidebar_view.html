@@ -24,10 +24,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
   
     <!--includeServerSide CSS FILE-->
-    <?!= includeServerSide('SB_client_CSS'); ?> 
-  
-    <script>
-    </script>
+    <?!= includeServerSide('client/sidebar_styles.html'); ?>
   </head>
   
   <body>
@@ -117,52 +114,11 @@
     </template>
   
     <!--includeServerSide JS FILES-->
-    <?!= includeServerSide('SB_client_APPLICATIONSTATE'); ?>
-    <?!= includeServerSide('SB_client_EVENTS'); ?>
-    <?!= includeServerSide('SB_client_UTILS'); ?>
-    <?!= includeServerSide('SB_client_ACTIONHANDLER'); ?>
+    <?!= includeServerSide('client/sidebar_script.html'); ?>
   
     <script>
-      // Inicialização da sidebar quando o DOM estiver pronto
       document.addEventListener('DOMContentLoaded', function() {
-        if (typeof initializeSidebar === 'function') {
-          initializeSidebar().then(() => {
-            // Configura todos os event listeners após a inicialização
-            if (typeof setupAllEventListeners === 'function') {
-              setupAllEventListeners();
-            } else {
-              console.error('❌ Função setupAllEventListeners não encontrada');
-            }
-            
-            // Programmatically set focus to the search input
-            const searchInput = document.getElementById('searchInputId');
-            if (searchInput) {
-              searchInput.focus();
-            }
-            
-            // Event listeners para os botões do grid
-            document.getElementById('btn-append').addEventListener('click', function() {
-              actionHandler.handleBtnAppendClick();
-            });
-            
-            document.getElementById('btn-cursor-text').addEventListener('click', function() {
-              actionHandler.handleBtnCursorTextClick();
-            });
-            
-            document.getElementById('btn-brush').addEventListener('click', function() {
-              actionHandler.handleBtnBrushClick();
-            });
-            
-            document.getElementById('btn-magic').addEventListener('click', function() {
-              actionHandler.handleBtnMagicClick();
-            });
-
-          }).catch(error => {
-            console.error('❌ Erro na inicialização da sidebar:', error);
-          });
-        } else {
-          console.error('❌ Função initializeSidebar não encontrada');
-        }
+        app.init();
       });
     </script>
   
