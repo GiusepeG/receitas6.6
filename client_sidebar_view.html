@@ -24,7 +24,10 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
   
     <!--includeServerSide CSS FILE-->
-    <?!= includeServerSide('client/sidebar_styles.html'); ?>
+    <?!= includeServerSide('client_sidebar_styles.html'); ?>
+
+    <script>
+    </script>
   </head>
   
   <body>
@@ -114,11 +117,21 @@
     </template>
   
     <!--includeServerSide JS FILES-->
-    <?!= includeServerSide('client/sidebar_script.html'); ?>
+    <?!= includeServerSide('client_js_utils.html'); ?>
+    <?!= includeServerSide('client_js_action_handler.html'); ?>
   
     <script>
+      // The DOMContentLoaded event listeners in client_js_utils.html will handle initialization.
+      // This block now only needs to wire up the specific action buttons to the ActionHandler instance.
       document.addEventListener('DOMContentLoaded', function() {
-        app.init();
+        if (typeof actionHandler !== 'undefined') {
+            document.getElementById('btn-append').addEventListener('click', () => actionHandler.handleBtnAppendClick());
+            document.getElementById('btn-cursor-text').addEventListener('click', () => actionHandler.handleBtnCursorTextClick());
+            document.getElementById('btn-brush').addEventListener('click', () => actionHandler.handleBtnBrushClick());
+            document.getElementById('btn-magic').addEventListener('click', () => actionHandler.handleBtnMagicClick());
+        } else {
+            console.error('❌ ActionHandler not found. Initialization failed.');
+        }
       });
     </script>
   

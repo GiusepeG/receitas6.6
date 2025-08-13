@@ -1,0 +1,157 @@
+<script>
+    /**
+     * @class ActionHandler
+     * @description Handles all primary user actions from the sidebar, delegating to server-side services.
+     * This class relies on helper functions and state management defined in other included scripts.
+     */
+    class ActionHandler {
+      constructor() {
+        this.state = ApplicationState.getInstance();
+      }
+
+      /**
+       * Handles the primary "Insert" action.
+       * @param {boolean} shouldFormat - Whether to re-format the document after insertion.
+       */
+      runInsert(shouldFormat) {
+        showLoadingSpinner();
+        const text = getConcatenatedListItemsText();
+
+        google.script.run
+          .withSuccessHandler(status => {
+            if (status === "INSERTED_DIRECTLY" || status === "FORMATTED_ONLY") {
+              this._handleSuccess();
+            } else {
+              this._handleError({ message: "Unexpected status from server: " + status });
+            }
+          })
+          .withFailureHandler(error => this._handleError(error))
+          .insertTextAndFormat(JSON.stringify({ text, shouldFormat }));
+      }
+
+      /**
+       * Handles the "Append" action, which adds text to the end of the document.
+       */
+      handleBtnAppendClick() {
+        showLoadingSpinner();
+
+        const listItems = document.querySelectorAll('#listBotton li.list-group-item');
+        if (listItems.length === 0) {
+          // If list is empty, just format the document.
+          google.script.run
+            .withSuccessHandler(() => this._handleSuccess(false)) // Don't clear list if it's already empty
+            .withFailureHandler(error => this._handleError(error))
+            .DocumentService.executeFormat();
+          return;
+        }
+
+        const text = getConcatenatedListItemsText();
+
+        // This server call validates the document and either appends directly
+        // or triggers a dialog if there are multiple H1s.
+        google.script.run
+          .withSuccessHandler(result => {
+            if (result.success) {
+              this._handleSuccess();
+            } else {
+              if (result.action === 'show_dialog') {
+                // Server will open the dialog. We just clear the list on the client.
+                this._handleSuccess();
+              } else {
+                this._handleError(result);
+              }
+            }
+          })
+          .withFailureHandler(error => this._handleError(error))
+          .validateAndExecuteAppend(JSON.stringify({ text, shouldFormat: true }));
+      }
+
+      /**
+       * Handles the "Cursor-Text" action, inserting text at the cursor position.
+       */
+      handleBtnCursorTextClick() {
+        const listItems = document.querySelectorAll('#listBotton li.list-group-item');
+        if (listItems.length === 0) return;
+
+        showLoadingSpinner();
+        const text = getConcatenatedListItemsText();
+
+        google.script.run
+          .withSuccessHandler(result => {
+            if (result.success) {
+              this._handleSuccess();
+            } else {
+              this._handleError(result);
+            }
+          })
+          .withFailureHandler(error => this._handleError(error))
+          .checkSelectionAndInsertAtCursor(JSON.stringify({ text, shouldFormat: false }));
+      }
+
+      /**
+       * Handles the "Brush" action for AI-powered improvements.
+       */
+      handleBtnBrushClick() {
+        showLoadingSpinner();
+        google.script.run
+          .withSuccessHandler(result => {
+            hideLoadingSpinner();
+            if (!result.success) {
+              alert(`❌ ${result.message}`);
+            }
+          })
+          .withFailureHandler(error => this._handleError(error))
+          .executeCompleteBrushFlowWithPairs();
+      }
+
+      /**
+       * Handles the "Magic" action to open the AI processing modal.
+       */
+      handleBtnMagicClick() {
+        showLoadingSpinner();
+        const promptsData = this._preparePromptsDataForServer();
+        google.script.run
+          .withSuccessHandler(() => hideLoadingSpinner())
+          .withFailureHandler(error => this._handleError(error))
+          .callMagicModal(promptsData);
+      }
+
+      /**
+       * Prepares prompt data from the client-side state to be sent to the server.
+       * @private
+       */
+      _preparePromptsDataForServer() {
+        const allPrompts = this.state.getAllPrompts();
+        if (!allPrompts) return [];
+        return Object.keys(allPrompts).map(key => ({
+          optionText: key,
+          ...allPrompts[key]
+        }));
+      }
+
+      /**
+       * Generic success handler.
+       * @private
+       */
+      _handleSuccess(shouldClearList = true) {
+        if (shouldClearList) clearListBotton();
+        enableActionButtons();
+        hideLoadingSpinner();
+      }
+
+      /**
+       * Generic error handler.
+       * @private
+       */
+      _handleError(error) {
+        enableActionButtons();
+        hideLoadingSpinner();
+        const message = error.message || "An unknown error occurred.";
+        console.error("❌ Operation failed:", message);
+        alert(message);
+      }
+    }
+
+    // Create a single instance of the handler to be used by the UI.
+    const actionHandler = new ActionHandler();
+</script>
